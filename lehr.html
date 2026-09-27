@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uhren-Hub | EdTech für Lehrkräfte</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        :root {
+            --bg-color: #F3EFE6; --text-main: #3E362E; --primary: #BA7346; --primary-hover: #A36239;
+            --secondary: #5C5248; --border: #D6CFC4; --paper: #FFFFFF;
+        }
+
+        html, body { height: 100%; margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-main); overflow: hidden; }
+        .font-kids { font-family: 'Comic Neue', cursive; letter-spacing: 1px; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D6CFC4; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+        .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+        .toast-leave { animation: slideOut 0.3s ease-in forwards; }
+        @keyframes slideIn { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(100%); opacity: 0; } }
+
+        /* --- BULLETPROOF PRINT SYSTEM --- */
+        #print-zone { display: none; }
+        
+        /* Die exakte A4 Seite: min-height statt height und overflow:hidden verhindern versteckte Überläufe */
+        .a4-page {
+            width: 210mm !important;
+            min-height: 297mm !important;
+            margin: 0 auto !important;
+            padding: 15mm 15mm 20mm 15mm !important;
+            box-sizing: border-box !important;
+            background: white !important;
+            position: relative !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+        }
+        
+        /* Vorschau-spezifisches Styling (Schatten, damit es wie Papier wirkt) */
+        #preview-content .a4-page {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+            margin-bottom: 20mm !important;
+        }
+        
+        #preview-scale-wrapper { transform-origin: top center; transition: transform 0.2s ease-out; }
+
+        /* Grids nutzen flex-grow: 1, um die 297mm Seite perfekt auszufüllen */
+        .print-grid-3x3 { flex-grow: 1 !important; display: grid !important; grid-template-columns: repeat(3, 1fr) !important; grid-template-rows: repeat(3, 1fr) !important; gap: 10mm !important; }
+        .print-grid-4x6 { flex-grow: 1 !important; display: grid !important; grid-template-columns: repeat(4, 1fr) !important; grid-template-rows: repeat(6, 1fr) !important; gap: 2mm !important; }
+        .print-grid-2x7 { flex-grow: 1 !important; display: grid !important; grid-template-columns: repeat(2, 1fr) !important; grid-template-rows: repeat(7, 1fr) !important; gap: 3mm !important; }
+        .print-grid-4x4 { flex-grow: 1 !important; display: grid !important; grid-template-columns: repeat(4, 1fr) !important; grid-template-rows: repeat(4, 1fr) !important; gap: 3mm !important; }
+
+        .print-card-dashed { border: 2px dashed #000 !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; }
+        .print-card-solid { border: 2px solid #000 !important; display: flex !important; align-items: center !important; justify-content: center !important; text-align: center !important; }
+
+        svg { max-width: 100% !important; max-height: 100% !important; }
+        .svg-stroke { stroke: #000 !important; }
+        .svg-fill { fill: #000 !important; }
+
+        @media print {
+            /* Die App-Shell komplett zurücksetzen, damit nichts den Druck blockiert */
+            html, body {
+                width: 100% !important;
+                height: max-content !important;
+                min-height: auto !important;
+                overflow: visible !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                position: static !important;
+                display: block !important;
+            }
+            
+            /* Normale UI komplett ausblenden */
+            body > *:not(#print-zone) { display: none !important; }
+            
+            /* Nur die Print-Zone anzeigen (Static verhindert 0-Seiten-Bugs im Safari) */
+            #print-zone {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+            }
+
+            @page { size: A4 portrait; margin: 0; }
+
+            .a4-page {
+                box-shadow: none !important;
+                margin: 0 !important;
+                margin-bottom: 0 !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            .a4-page:last-child { page-break-after: auto !important; break-after: auto !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <!-- Print Zone -->
+    <div id="print-zone"></div>
+
+    <!-- Print Preview Modal -->
+    <div id="preview-modal" class="fixed inset-0 z-[150] hidden flex-col bg-[#2D2620]/95 backdrop-blur-sm transition-opacity">
+        <!-- Header -->
+        <div class="h-16 bg-white/5 border-b border-white/10 flex items-center justify-between px-4 lg:px-8 shrink-0 shadow-sm">
+            <div class="flex items-center gap-3 text-white">
+                <div class="p-2 bg-[var(--primary)] rounded-lg"><i data-lucide="eye" class="w-5 h-5"></i></div>
+                <h2 class="text-xl font-bold">Druckvorschau</h2>
+            </div>
+            <button onclick="app.closePreview()" class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+        <!-- Body (Scrollable Area) -->
+        <div id="preview-scroll-area" class="flex-1 overflow-y-auto p-4 lg:p-8 flex flex-col items-center">
+            <div id="preview-scale-wrapper">
+                <div id="preview-content" class="flex flex-col"></div>
+            </div>
+        </div>
+        <!-- Footer -->
+        <div class="bg-white p-4 lg:px-8 border-t border-[var(--border)] flex items-center justify-between shrink-0 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)]">
+            <button onclick="app.closePreview()" class="px-6 py-3 text-[#8C7A6B] hover:text-[var(--text-main)] font-semibold transition-colors">Abbrechen</button>
+            <button onclick="app.executePrint()" class="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold rounded-xl px-8 py-3 flex items-center gap-2 transition-colors shadow-sm">
+                <i data-lucide="printer" class="w-5 h-5"></i> Jetzt Drucken
+            </button>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirm-modal" class="fixed inset-0 z-[200] hidden flex-col items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl mx-4 border border-[var(--border)]">
+            <h3 class="text-xl font-bold mb-2 text-[var(--text-main)]">Bist du sicher?</h3>
+            <p id="confirm-msg" class="text-[#8C7A6B] mb-6">Möchtest du diese Aktion wirklich ausführen?</p>
+            <div class="flex gap-3 justify-end">
+                <button id="confirm-btn-cancel" class="px-4 py-2 text-[#8C7A6B] hover:text-[var(--text-main)] font-semibold transition-colors rounded-xl">Abbrechen</button>
+                <button id="confirm-btn-ok" class="bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-xl px-5 py-2.5 transition-colors">Bestätigen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loader" class="fixed inset-0 z-[200] bg-[var(--bg-color)] flex flex-col items-center justify-center transition-opacity duration-300">
+        <i data-lucide="loader-2" class="w-10 h-10 text-[var(--primary)] animate-spin mb-4"></i>
+        <p class="text-sm font-medium text-[#8C7A6B]">Verbinde mit Cloud...</p>
+    </div>
+
+    <!-- Main App Shell -->
+    <div id="app-shell" class="hidden flex-1 h-full w-full">
+
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden backdrop-blur-sm transition-opacity"></div>
+
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-[#2D2620] text-[#E8E2D9] flex flex-col transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 shadow-2xl lg:shadow-none">
+            <div class="p-6 flex items-center justify-between border-b border-[#403831]">
+                <div class="flex items-center gap-3">
+                    <div class="bg-[var(--primary)] p-1.5 rounded-lg"><i data-lucide="clock" class="w-5 h-5 text-white"></i></div>
+                    <span class="text-xl font-bold tracking-tight text-white">Uhren-Hub</span>
+                </div>
+                <button id="btn-close-menu" class="lg:hidden text-[#8C7A6B] hover:text-white"><i data-lucide="x"></i></button>
+            </div>
+
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+                <div id="nav-container"></div>
+            </nav>
+        </aside>
+
+        <main class="flex-1 flex flex-col min-w-0 h-full relative bg-[var(--bg-color)]">
+            <header class="h-16 bg-white/80 backdrop-blur-md border-b border-[var(--border)] flex items-center justify-between px-4 lg:px-8 shrink-0 sticky top-0 z-30">
+                <div class="flex items-center gap-4">
+                    <button id="btn-open-menu" class="lg:hidden p-2 -ml-2 text-[#8C7A6B] hover:bg-[#FAF9F6] rounded-lg"><i data-lucide="menu"></i></button>
+                    <h2 id="header-title" class="text-lg lg:text-xl font-bold text-[var(--text-main)]">Dashboard</h2>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="hidden sm:flex flex-col items-end">
+                        <span class="text-xs font-semibold text-[#8C7A6B] uppercase">Cloud-Sync</span>
+                        <span id="cloud-status-text" class="text-sm font-bold text-[#8C7A6B]">Lade...</span>
+                    </div>
+                    <div id="cloud-status-icon" class="w-10 h-10 rounded-full bg-[#E8DCCB] border-2 border-white shadow-sm flex items-center justify-center font-bold text-[var(--secondary)]">
+                        <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
+                    </div>
+                </div>
+            </header>
+
+            <div id="views-container" class="flex-1 overflow-y-auto p-4 lg:p-8"></div>
+        </main>
+    </div>
+
+    <!-- ==================== TEMPLATES FOR VIEWS ==================== -->
+    <template id="tpl-dashboard">
+        <div class="max-w-5xl mx-auto space-y-8">
+            <header class="mb-8">
+                <h1 class="text-3xl lg:text-4xl font-bold text-[var(--text-main)] mb-2">Was möchtest du heute machen?</h1>
+                <p class="text-[#8C7A6B] text-lg">Wähle ein Werkzeug, um in Sekunden passendes Material zu erstellen.</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button onclick="app.navigate('worksheet')" class="bg-white p-6 rounded-2xl border border-[var(--border)] hover:border-[var(--primary)] hover:shadow-md transition-all group text-left">
+                    <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><i data-lucide="file-text"></i></div>
+                    <h3 class="font-bold text-lg mb-1">Arbeitsblatt</h3>
+                    <p class="text-sm text-[#8C7A6B]">Zeiger einzeichnen oder Zeiten ablesen.</p>
+                </button>
+                <button onclick="app.navigate('lesson-planner')" class="bg-white p-6 rounded-2xl border border-[var(--border)] hover:border-[var(--primary)] hover:shadow-md transition-all group text-left">
+                    <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><i data-lucide="graduation-cap"></i></div>
+                    <h3 class="font-bold text-lg mb-1">Stunden-Planer</h3>
+                    <p class="text-sm text-[#8C7A6B]">Interaktive Stunde planen &amp; speichern.</p>
+                </button>
+                <button onclick="app.navigate('time-tracker')" class="bg-white p-6 rounded-2xl border border-[var(--border)] hover:border-[var(--primary)] hover:shadow-md transition-all group text-left">
+                    <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><i data-lucide="bar-chart"></i></div>
+                    <h3 class="font-bold text-lg mb-1">Lernstand</h3>
+                    <p class="text-sm text-[#8C7A6B]">Fortschritt pro Kind festhalten.</p>
+                </button>
+                <button onclick="app.navigate('seating-plan')" class="bg-white p-6 rounded-2xl border border-[var(--border)] hover:border-[var(--primary)] hover:shadow-md transition-all group text-left">
+                    <div class="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><i data-lucide="users"></i></div>
+                    <h3 class="font-bold text-lg mb-1">Sitzplan</h3>
+                    <p class="text-sm text-[#8C7A6B]">Interaktiv, speichert sich automatisch.</p>
+                </button>
+            </div>
+
+            <h2 class="text-xl font-bold text-[var(--text-main)] mt-12 mb-4">Generatoren zum Ausdrucken</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button onclick="app.navigate('memory')" class="bg-[#FAF9F6] p-5 rounded-xl border border-[var(--border)] hover:bg-white flex items-center gap-4 transition-colors text-left">
+                    <div class="p-3 bg-white rounded-lg shadow-sm"><i data-lucide="layout-grid" class="text-[var(--primary)]"></i></div>
+                    <div><h4 class="font-bold">Memory</h4><p class="text-xs text-[#8C7A6B]">Analog vs. Digital</p></div>
+                </button>
+                <button onclick="app.navigate('domino')" class="bg-[#FAF9F6] p-5 rounded-xl border border-[var(--border)] hover:bg-white flex items-center gap-4 transition-colors text-left">
+                    <div class="p-3 bg-white rounded-lg shadow-sm"><i data-lucide="dice-5" class="text-[var(--primary)]"></i></div>
+                    <div><h4 class="font-bold">Domino</h4><p class="text-xs text-[#8C7A6B]">Endlose Kette legen</p></div>
+                </button>
+                <button onclick="app.navigate('bingo')" class="bg-[#FAF9F6] p-5 rounded-xl border border-[var(--border)] hover:bg-white flex items-center gap-4 transition-colors text-left">
+                    <div class="p-3 bg-white rounded-lg shadow-sm"><i data-lucide="grid-3x3" class="text-[var(--primary)]"></i></div>
+                    <div><h4 class="font-bold">Bingo</h4><p class="text-xs text-[#8C7A6B]">Für die ganze Klasse</p></div>
+                </button>
+                <button onclick="app.navigate('dailyroutine')" class="bg-[#FAF9F6] p-5 rounded-xl border border-[var(--border)] hover:bg-white flex items-center gap-4 transition-colors text-left">
+                    <div class="p-3 bg-white rounded-lg shadow-sm"><i data-lucide="sun" class="text-[var(--primary)]"></i></div>
+                    <div><h4 class="font-bold">Tagesablauf</h4><p class="text-xs text-[#8C7A6B]">Eigene Zeiten eintragen</p></div>
+                </button>
+                <button onclick="app.navigate('timespan')" class="bg-[#FAF9F6] p-5 rounded-xl border border-[var(--border)] hover:bg-white flex items-center gap-4 transition-colors text-left">
+                    <div class="p-3 bg-white rounded-lg shadow-sm"><i data-lucide="hourglass" class="text-[var(--primary)]"></i></div>
+                    <div><h4 class="font-bold">Zeitspannen</h4><p class="text-xs text-[#8C7A6B]">Start + Dauer = Ende</p></div>
+                </button>
+                <button onclick="app.navigate('quiz')" class="bg-[#FAF9F6] p-5 rounded-xl border border-[var(--border)] hover:bg-white flex items-center gap-4 transition-colors text-left">
+                    <div class="p-3 bg-white rounded-lg shadow-sm"><i data-lucide="clipboard-check" class="text-[var(--primary)]"></i></div>
+                    <div><h4 class="font-bold">Lernkontrolle</h4><p class="text-xs text-[#8C7A6B]">Benotbarer Kurztest</p></div>
+                </button>
+            </div>
+            
+            <h2 class="text-xl font-bold text-[var(--text-main)] mt-12 mb-4">Schnell-Aktionen</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pb-8">
+                <button onclick="app.generateExitTicket()" class="bg-[#FAF9F6] p-5 rounded-xl border border-[var(--border)] hover:bg-white flex items-center gap-4 transition-colors text-left">
+                    <div class="p-3 bg-orange-100 text-orange-600 rounded-lg shadow-sm"><i data-lucide="zap"></i></div>
+                    <div><h4 class="font-bold">5-Minuten Exit-Ticket</h4><p class="text-xs text-[#8C7A6B]">Schnelldruck (Stufe 3)</p></div>
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-worksheet">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--border)] mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Aufgabenart</label>
+                        <select id="ws-task" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="read">Zeiten ablesen</option>
+                            <option value="draw">Zeiger einzeichnen</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Lernziel / Stufe</label>
+                        <select id="ws-level" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="1">Stufe 1: Volle Stunden</option>
+                            <option value="2">Stufe 2: Halbe Stunden</option>
+                            <option value="3" selected>Stufe 3: Viertelstunden</option>
+                            <option value="4">Stufe 4: 5-Minuten-Schritte</option>
+                            <option value="5">Stufe 5: Minutengenau</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Format</label>
+                        <select id="ws-format" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="24">24-Stunden-System (z.B. 14:00)</option>
+                            <option value="12">12-Stunden-System (z.B. 2:00)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between pt-6 border-t border-[var(--border)]">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="ws-solution" class="w-5 h-5 accent-[var(--primary)] rounded">
+                        <span class="text-sm font-medium text-[var(--text-main)]">Lösungsblatt mitdrucken</span>
+                    </label>
+                    <button onclick="app.generators.printWorksheet()" class="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-semibold rounded-xl px-6 py-3 flex items-center gap-2 transition-colors">
+                        <i data-lucide="printer" class="w-5 h-5"></i> Drucken
+                    </button>
+                </div>
+            </div>
+            
+            <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+                <i data-lucide="info" class="w-8 h-8 text-blue-400 mx-auto mb-3"></i>
+                <h3 class="text-blue-900 font-bold mb-1">Automatische Generierung</h3>
+                <p class="text-sm text-blue-700">Klicke auf "Drucken". Die Aufgaben werden mathematisch korrekt, ohne Duplikate und exakt passend zur Stufe für ein A4-Blatt generiert.</p>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-lesson-planner">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--border)] mb-6">
+                <div class="flex flex-col md:flex-row md:items-end gap-4 md:justify-between">
+                    <div class="flex-1 min-w-0">
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Gespeicherter Plan</label>
+                        <select id="lp-plan-select" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]"></select>
+                    </div>
+                    <div class="flex gap-2 flex-wrap">
+                        <select id="lp-new-class" class="bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 text-sm focus:outline-none focus:border-[var(--primary)]">
+                            <option value="1">Gruppe 1</option>
+                            <option value="2">Gruppe 2</option>
+                        </select>
+                        <button id="lp-btn-new" class="bg-[var(--secondary)] hover:bg-[#403831] text-white font-semibold rounded-xl px-4 py-3 text-sm whitespace-nowrap">+ Neuer Plan</button>
+                        <button id="lp-btn-delete" class="bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-xl px-4 py-3 text-sm" title="Plan löschen"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="lp-editor" class="hidden bg-white p-6 rounded-2xl shadow-sm border border-[var(--border)]">
+                <div class="flex flex-col md:flex-row md:items-center gap-3 mb-1">
+                    <input id="lp-title" type="text" placeholder="Titel der Stunde..." class="flex-1 text-xl font-bold border-b-2 border-transparent focus:border-[var(--primary)] focus:outline-none py-1 bg-transparent">
+                    <div class="flex items-center text-sm shrink-0">
+                        <div class="flex items-center gap-2 text-[#8C7A6B]">
+                            <i data-lucide="clock" class="w-4 h-4"></i>
+                            <span id="lp-total-minutes">0</span> Minuten gesamt
+                        </div>
+                        <span id="lp-save-status" class="text-xs text-green-600 font-bold ml-4">Gespeichert ✓</span>
+                    </div>
+                </div>
+                <p class="text-xs text-[#8C7A6B] mb-4">Änderungen werden während dem Tippen automatisch in der Cloud gespeichert.</p>
+
+                <div id="lp-phases" class="space-y-3 mb-4"></div>
+
+                <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[var(--border)]">
+                    <button id="lp-btn-add-phase" class="flex-1 border-2 border-dashed border-[var(--border)] hover:border-[var(--primary)] text-[#8C7A6B] hover:text-[var(--primary)] font-semibold rounded-xl py-3 transition-colors">+ Phase hinzufügen</button>
+                    <button id="lp-btn-print" class="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-semibold rounded-xl px-6 py-3 flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
+                        <i data-lucide="printer" class="w-5 h-5"></i> Drucken
+                    </button>
+                </div>
+            </div>
+
+            <div id="lp-empty" class="text-center py-16 rounded-2xl border-2 border-dashed border-[var(--border)] text-[#8C7A6B]">
+                Noch kein Plan vorhanden. Klicke auf "+ Neuer Plan", um zu starten.
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-time-tracker">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--border)] mb-6">
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold text-[var(--text-main)]">Klassen-Lernstand</h3>
+                        <p class="text-sm text-[#8C7A6B]">Namen eintragen und Fortschritt live speichern.</p>
+                    </div>
+                    <form id="add-student-form" class="flex gap-2">
+                        <input type="text" id="new-student-name" required placeholder="Name des Kindes..." class="bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-2.5 text-sm outline-none focus:border-[var(--primary)] flex-1">
+                        <button type="submit" class="bg-[var(--secondary)] hover:bg-[#403831] text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0">Hinzufügen</button>
+                    </form>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr class="border-b-2 border-[var(--border)] text-sm text-[#8C7A6B]">
+                                <th class="py-3 px-4 font-semibold">Name</th>
+                                <th class="py-3 px-4 font-semibold text-center">Volle Std.</th>
+                                <th class="py-3 px-4 font-semibold text-center">Halbe Std.</th>
+                                <th class="py-3 px-4 font-semibold text-center">Viertel Std.</th>
+                                <th class="py-3 px-4 font-semibold text-center">Minuten</th>
+                                <th class="py-3 px-4 font-semibold text-right">Löschen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tracker-tbody">
+                            <tr><td colspan="6" class="text-center py-8 text-[#8C7A6B]">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-seating-plan">
+        <div class="max-w-5xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--border)] mb-6">
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold text-[var(--text-main)]">Klassen-Sitzplan</h3>
+                        <p class="text-sm text-[#8C7A6B]">Trage Namen direkt ein. Änderungen werden live für alle Nutzer gespeichert.</p>
+                    </div>
+                    <div class="flex gap-2 flex-wrap items-center">
+                        <span id="sp-save-status" class="text-xs text-green-600 font-bold mr-2 hidden sm:block"></span>
+                        <select id="sp-layout" class="bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-2.5 text-sm focus:outline-none focus:border-[var(--primary)]">
+                            <option value="rows">Klassische Reihen</option>
+                            <option value="groups">Gruppentische (6×4)</option>
+                            <option value="horseshoe">U-Form</option>
+                        </select>
+                        <button id="sp-btn-print" class="bg-[var(--secondary)] hover:bg-[#403831] text-white font-semibold rounded-xl px-4 py-2.5 text-sm flex items-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i> Drucken</button>
+                        <button id="sp-btn-clear" class="bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-xl px-4 py-2.5 text-sm">Alle leeren</button>
+                    </div>
+                </div>
+                <div class="w-full flex justify-center mb-8">
+                    <div class="w-48 h-14 border-2 border-dashed border-[#8C7A6B] bg-[#FAF9F6] flex items-center justify-center rounded-xl text-sm font-bold text-[#8C7A6B]">Lehrerpult / Tafel</div>
+                </div>
+                <div id="sp-grid" class="w-full grid gap-3 p-4 bg-[#FAF9F6] rounded-xl border border-[var(--border)] min-h-[300px]"></div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-generic-generator">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--border)] mb-6">
+                <h2 id="gen-title" class="text-2xl font-bold mb-2 text-[var(--text-main)]">Generator</h2>
+                <p id="gen-desc" class="text-[#8C7A6B] mb-6 text-sm">Beschreibung...</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Schwierigkeit</label>
+                        <select id="gen-level" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="1">Volle Stunden</option>
+                            <option value="2">Halbe Stunden (inkl. voll)</option>
+                            <option value="3" selected>Viertelstunden (inkl. voll/halb)</option>
+                            <option value="4">5-Minuten-Schritte</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Format</label>
+                        <select id="gen-format" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="12" selected>12-Stunden-System</option>
+                            <option value="24">24-Stunden-System (gemischt)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end pt-6 border-t border-[var(--border)]">
+                    <button id="gen-btn-print" class="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-semibold rounded-xl px-6 py-3 flex items-center gap-2 transition-colors">
+                        <i data-lucide="printer" class="w-5 h-5"></i> Generieren &amp; Drucken
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-dailyroutine">
+        <div class="max-w-3xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--border)] mb-6">
+                <h2 class="text-xl font-bold mb-2">Tagesablauf-Arbeitsblatt</h2>
+                <p class="text-sm text-[#8C7A6B] mb-4">Die Kinder tragen ihre eigene Uhrzeit ein und zeichnen die Zeiger passend dazu ein. Passe die Ereignisse bei Bedarf an (eine Zeile = ein Ereignis).</p>
+                <textarea id="dr-events" rows="7" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 text-sm font-mono focus:outline-none focus:border-[var(--primary)]">Ich stehe auf
+Die Schule beginnt
+Große Hofpause
+Mittagessen
+Hausaufgaben
+Ich gehe ins Bett</textarea>
+                <div class="flex justify-end mt-4">
+                    <button onclick="app.generators.printDailyRoutine()" class="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-semibold rounded-xl px-6 py-3 flex items-center gap-2 transition-colors">
+                        <i data-lucide="printer" class="w-5 h-5"></i> Drucken
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-timespan">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--border)] mb-6">
+                <h2 class="text-xl font-bold mb-4">Zeitspannen-Trainer</h2>
+                <p class="text-sm text-[#8C7A6B] mb-6">Übt "Start + Dauer = Ende" — ideal zur Vorbereitung auf Fahrpläne, Kochrezepte &amp; Co.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Schwierigkeit</label>
+                        <select id="ts-level" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="1">Volle Stunden (+1, +2, +3 Std.)</option>
+                            <option value="2" selected>Halbe Stunden</option>
+                            <option value="3">Viertelstunden</option>
+                            <option value="4">5-Minuten-Schritte</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Anzahl Aufgaben</label>
+                        <select id="ts-count" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="6">6 Aufgaben (viel Platz)</option>
+                            <option value="8" selected>8 Aufgaben</option>
+                            <option value="10">10 Aufgaben</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Format</label>
+                        <select id="ts-format" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="24" selected>24-Stunden-System</option>
+                            <option value="12">12-Stunden-System</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between pt-6 border-t border-[var(--border)]">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="ts-solution" checked class="w-5 h-5 accent-[var(--primary)] rounded">
+                        <span class="text-sm font-medium text-[var(--text-main)]">Lösungsblatt mitdrucken</span>
+                    </label>
+                    <button onclick="app.generators.printTimespan()" class="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-semibold rounded-xl px-6 py-3 flex items-center gap-2 transition-colors">
+                        <i data-lucide="printer" class="w-5 h-5"></i> Drucken
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-quiz">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--border)] mb-6">
+                <h2 class="text-xl font-bold mb-2">Lernkontrolle: Uhrzeiten</h2>
+                <p class="text-sm text-[#8C7A6B] mb-6">Erstellt eine vollständige, benotbare Lernkontrolle mit 3 Aufgabenblöcken (12 Punkte) inkl. Notenschlüssel.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Schwierigkeit</label>
+                        <select id="qz-level" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="2">Gruppe 1: Volle &amp; halbe Stunden</option>
+                            <option value="3" selected>Gruppe 2: Viertelstunden &amp; 5-Min</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-[#8C7A6B] mb-2">Format</label>
+                        <select id="qz-format" class="w-full bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-3 focus:outline-none focus:border-[var(--primary)]">
+                            <option value="24" selected>24-Stunden-System</option>
+                            <option value="12">12-Stunden-System</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between pt-6 border-t border-[var(--border)]">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="qz-solution" checked class="w-5 h-5 accent-[var(--primary)] rounded">
+                        <span class="text-sm font-medium text-[var(--text-main)]">Lösungsblatt generieren</span>
+                    </label>
+                    <button onclick="app.generators.printQuiz()" class="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-semibold rounded-xl px-6 py-3 flex items-center gap-2 transition-colors">
+                        <i data-lucide="eye" class="w-5 h-5"></i> Vorschau & Drucken
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Bulletproof Firebase Environment Checking
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'teacher-hub';
+        
+        let configObj;
+        if (typeof __firebase_config !== 'undefined') {
+            configObj = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+        } else {
+            // User fallback
+            configObj = {
+                apiKey: "AIzaSyDNolOx4o0-QFO4hc9qlCdfOrdqXWDhURI",
+                authDomain: "lernplattform-290d6.firebaseapp.com",
+                projectId: "lernplattform-290d6",
+                storageBucket: "lernplattform-290d6.firebasestorage.app",
+                messagingSenderId: "467358452410",
+                appId: "1:467358452410:web:46970fced23fdf35cfd083"
+            };
+        }
+        
+        const fbApp = initializeApp(configObj);
+        const auth = getAuth(fbApp);
+        const db = getFirestore(fbApp);
+
+        // --- Helper ---
+        function escapeHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = str ?? '';
+            return d.innerHTML;
+        }
+        function debounce(fn, delay = 500) {
+            let t;
+            return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+        }
+        function linkOptionsHtml(selected, options) {
+            return options.map(o => `<option value="${o.value}" ${o.value === (selected || '') ? 'selected' : ''}>${o.label}</option>`).join('');
+        }
+        
+        function phaseCardHtml(p, idx, total, linkOptions) {
+            return `
+            <div class="phase-card flex flex-col md:flex-row gap-3 bg-[#FAF9F6] border border-[var(--border)] rounded-xl p-4" data-phase-id="${p.id}">
+                <div class="flex md:flex-col gap-1 items-center md:items-stretch shrink-0">
+                    <button class="lp-move-up p-1.5 text-[#8C7A6B] hover:text-[var(--primary)] disabled:opacity-30 disabled:cursor-not-allowed" ${idx === 0 ? 'disabled' : ''} title="Nach oben"><i data-lucide="chevron-up" class="w-4 h-4"></i></button>
+                    <button class="lp-move-down p-1.5 text-[#8C7A6B] hover:text-[var(--primary)] disabled:opacity-30 disabled:cursor-not-allowed" ${idx === total - 1 ? 'disabled' : ''} title="Nach unten"><i data-lucide="chevron-down" class="w-4 h-4"></i></button>
+                </div>
+                <div class="flex-1 space-y-2 min-w-0">
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <input type="text" class="lp-phase-title font-bold flex-1 min-w-[140px] bg-white border border-[var(--border)] rounded-lg p-2 text-sm focus:outline-none focus:border-[var(--primary)]" value="${escapeHtml(p.title || '')}" placeholder="Phasenname...">
+                        <div class="flex items-center gap-1 bg-white border border-[var(--border)] rounded-lg px-2">
+                            <input type="number" min="1" max="90" class="lp-phase-minutes w-14 text-sm p-2 text-center focus:outline-none" value="${p.minutes || 0}">
+                            <span class="text-xs text-[#8C7A6B]">Min</span>
+                        </div>
+                        <select class="lp-phase-link bg-white border border-[var(--border)] rounded-lg p-2 text-xs focus:outline-none">
+                            ${linkOptionsHtml(p.linkTo, linkOptions)}
+                        </select>
+                        <button class="lp-phase-delete text-gray-400 hover:text-red-500 p-2" title="Phase löschen"><i data-lucide="x" class="w-4 h-4"></i></button>
+                    </div>
+                    <textarea class="lp-phase-desc w-full bg-white border border-[var(--border)] rounded-lg p-2 text-sm resize-y focus:outline-none focus:border-[var(--primary)]" rows="2" placeholder="Beschreibung / Ablauf...">${escapeHtml(p.description || '')}</textarea>
+                    ${p.linkTo ? `<button class="lp-phase-goto text-xs font-semibold text-[var(--primary)] hover:underline flex items-center gap-1"><i data-lucide="arrow-right" class="w-3 h-3"></i> Werkzeug öffnen</button>` : ''}
+                </div>
+            </div>`;
+        }
+
+        // --- Core App Logic ---
+        window.app = {
+            user: null,
+            isPrinting: false,
+            currentPrintHtml: null,
+
+            async init() {
+                lucide.createIcons();
+                this.setupNavigation();
+                
+                try {
+                    // 1. Direct await Auth (No race conditions with listeners)
+                    const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                    if (token) {
+                        await signInWithCustomToken(auth, token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    
+                    this.user = auth.currentUser;
+                    
+                    // 2. Set UI to online
+                    const statusText = document.getElementById('cloud-status-text');
+                    if (statusText) {
+                        statusText.textContent = 'Sicher verbunden';
+                        statusText.classList.remove('text-red-500');
+                        statusText.classList.add('text-[#8C7A6B]');
+                    }
+                    const statusIcon = document.getElementById('cloud-status-icon');
+                    if (statusIcon) {
+                        statusIcon.innerHTML = '<i data-lucide="cloud-check" class="w-5 h-5 text-green-600"></i>';
+                    }
+                    lucide.createIcons();
+
+                    // 3. Start syncing tools
+                    this.lessonPlanner.listen();
+                    this.seating.listen();
+                    this.tracker.listen();
+
+                } catch (err) {
+                    console.error("Cloud Error:", err);
+                    this.setOfflineMode();
+                    this.toast("Offline-Modus (" + err.message + ")");
+                } finally {
+                    this.finishLoading();
+                }
+
+                // Cleanup preview events just in case
+                window.addEventListener('resize', debounce(() => {
+                    if(!document.getElementById('preview-modal').classList.contains('hidden')) {
+                        this.updatePreviewScale();
+                    }
+                }, 50));
+                
+                // Fallback for printing end
+                window.addEventListener('afterprint', () => {
+                    const zone = document.getElementById('print-zone');
+                    if (zone) zone.innerHTML = '';
+                    this.isPrinting = false;
+                });
+            },
+
+            // Eigene Confirm-Logik ohne den ekligen Browser-Dialog
+            confirmAction(message, onConfirm) {
+                const modal = document.getElementById('confirm-modal');
+                const msgEl = document.getElementById('confirm-msg');
+                const btnOk = document.getElementById('confirm-btn-ok');
+                const btnCancel = document.getElementById('confirm-btn-cancel');
+
+                msgEl.textContent = message;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+
+                const cleanup = () => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                    btnOk.onclick = null;
+                    btnCancel.onclick = null;
+                };
+
+                btnCancel.onclick = cleanup;
+                btnOk.onclick = () => {
+                    cleanup();
+                    onConfirm();
+                };
+            },
+
+            showPreview(htmlContent) {
+                this.currentPrintHtml = htmlContent;
+                const modal = document.getElementById('preview-modal');
+                const content = document.getElementById('preview-content');
+                
+                content.innerHTML = htmlContent;
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                
+                // Allow browser to render DOM before math
+                setTimeout(() => {
+                    this.updatePreviewScale();
+                }, 10);
+            },
+
+            updatePreviewScale() {
+                const scrollArea = document.getElementById('preview-scroll-area');
+                const scaleWrapper = document.getElementById('preview-scale-wrapper');
+                const content = document.getElementById('preview-content');
+                
+                if (!scrollArea || !scaleWrapper || !content) return;
+
+                // Reset constraints briefly to measure real width
+                scaleWrapper.style.height = 'auto';
+                scaleWrapper.style.transform = 'scale(1)';
+
+                const padding = 64; // Horizontal padding
+                const availableWidth = scrollArea.clientWidth - padding;
+                
+                // A4 Paper is 210mm. Im CSS entspricht das meist ca 794px 
+                const a4WidthPx = content.offsetWidth || 794; 
+                
+                let scale = 1;
+                if (availableWidth < a4WidthPx) {
+                    scale = availableWidth / a4WidthPx;
+                }
+
+                scaleWrapper.style.transform = `scale(${scale})`;
+                // Damit nach unten hin kein leerer Raum entsteht, korrigieren wir die Höhe mit dem Skalierungsfaktor
+                const actualHeight = content.offsetHeight;
+                scaleWrapper.style.height = `${actualHeight * scale}px`;
+            },
+
+            closePreview() {
+                const modal = document.getElementById('preview-modal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                this.currentPrintHtml = null;
+            },
+
+            executePrint() {
+                if (this.isPrinting || !this.currentPrintHtml) return;
+                this.isPrinting = true;
+                
+                try {
+                    const zone = document.getElementById('print-zone');
+                    zone.innerHTML = this.currentPrintHtml;
+                    
+                    // Force DOM reflow to make sure images & SVGs render before dialog
+                    void zone.offsetHeight;
+                    
+                    // Direkter, synchroner Aufruf. Moderne Browser blockieren window.print(),
+                    // wenn es asynchron via setTimeout oder requestAnimationFrame aufgerufen wird.
+                    window.print();
+                    
+                    // Fallback, falls der afterprint-Event-Listener fehlschlägt
+                    setTimeout(() => { this.isPrinting = false; }, 2000);
+                } catch(e) {
+                    console.error("Druckfehler", e);
+                    this.toast("Ein Fehler ist beim Drucken aufgetreten.");
+                    this.isPrinting = false;
+                }
+            },
+
+            setOfflineMode() {
+                const statusText = document.getElementById('cloud-status-text');
+                if (statusText) {
+                    statusText.textContent = 'Offline-Modus';
+                    statusText.classList.remove('text-[#8C7A6B]');
+                    statusText.classList.add('text-red-500');
+                }
+                const statusIcon = document.getElementById('cloud-status-icon');
+                if (statusIcon) {
+                    statusIcon.innerHTML = '<i data-lucide="cloud-off" class="w-5 h-5 text-red-500"></i>';
+                }
+                lucide.createIcons();
+            },
+
+            finishLoading() {
+                const loader = document.getElementById('loader');
+                if (loader && !loader.classList.contains('hidden')) {
+                    loader.classList.add('hidden');
+                    document.getElementById('app-shell').classList.remove('hidden');
+                    document.getElementById('app-shell').classList.add('flex');
+                    this.navigate('dashboard');
+                }
+            },
+
+            navItems: [
+                { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard', group: 'Übersicht' },
+                { id: 'worksheet', label: 'Arbeitsblatt', icon: 'file-text', group: 'Generatoren' },
+                { id: 'memory', label: 'Memory', icon: 'layout-grid', group: 'Generatoren', printFn: 'printMemory', desc: 'Erstellt 24 Memory-Karten (Analog & Digital) zum Ausschneiden.' },
+                { id: 'domino', label: 'Domino', icon: 'dice-5', group: 'Generatoren', printFn: 'printDomino', desc: 'Erstellt eine Domino-Kette mit 14 Steinen.' },
+                { id: 'bingo', label: 'Klassen-Bingo', icon: 'grid-3x3', group: 'Generatoren', printFn: 'printBingo', desc: 'Erstellt 1 Leitungsblatt + 14 Spielerscheine für die ganze Klasse.' },
+                { id: 'dailyroutine', label: 'Tagesablauf', icon: 'sun', group: 'Generatoren' },
+                { id: 'timespan', label: 'Zeitspannen-Trainer', icon: 'hourglass', group: 'Generatoren' },
+                { id: 'quiz', label: 'Lernkontrolle', icon: 'clipboard-check', group: 'Generatoren' },
+                { id: 'lesson-planner', label: 'Stunden-Planer', icon: 'graduation-cap', group: 'Tools' },
+                { id: 'time-tracker', label: 'Lernstand', icon: 'bar-chart', group: 'Tools' },
+                { id: 'seating-plan', label: 'Sitzplan', icon: 'users', group: 'Tools' },
+            ],
+
+            setupNavigation() {
+                const container = document.getElementById('nav-container');
+                let currentGroup = '';
+                this.navItems.forEach(item => {
+                    if (item.group !== currentGroup) {
+                        currentGroup = item.group;
+                        const header = document.createElement('div');
+                        header.className = 'text-xs font-bold text-[#8C7A6B] uppercase tracking-wider mb-2 mt-6 px-4';
+                        header.textContent = currentGroup;
+                        container.appendChild(header);
+                    }
+                    const btn = document.createElement('button');
+                    btn.className = 'nav-btn w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[#D6CFC4] hover:bg-[#403831] hover:text-white rounded-xl transition-all mb-1';
+                    btn.innerHTML = `<i data-lucide="${item.icon}" class="w-5 h-5"></i> ${item.label}`;
+                    btn.onclick = () => {
+                        this.navigate(item.id);
+                        if (window.innerWidth < 1024) this.toggleMenu(false);
+                    };
+                    btn.dataset.target = item.id;
+                    container.appendChild(btn);
+                });
+
+                document.getElementById('btn-open-menu').onclick = () => this.toggleMenu(true);
+                document.getElementById('btn-close-menu').onclick = () => this.toggleMenu(false);
+                document.getElementById('sidebar-overlay').onclick = () => this.toggleMenu(false);
+            },
+
+            toggleMenu(show) {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                if (show) { sidebar.classList.remove('-translate-x-full'); overlay.classList.remove('hidden'); }
+                else { sidebar.classList.add('-translate-x-full'); overlay.classList.add('hidden'); }
+            },
+
+            navigate(viewId) {
+                document.querySelectorAll('.nav-btn').forEach(b => {
+                    if (b.dataset.target === viewId) { b.classList.add('bg-[var(--primary)]', 'text-white'); b.classList.remove('text-[#D6CFC4]', 'hover:bg-[#403831]'); }
+                    else { b.classList.remove('bg-[var(--primary)]', 'text-white'); b.classList.add('text-[#D6CFC4]', 'hover:bg-[#403831]'); }
+                });
+
+                const viewData = this.navItems.find(v => v.id === viewId);
+                if (viewData) document.getElementById('header-title').textContent = viewData.label;
+
+                const container = document.getElementById('views-container');
+                container.innerHTML = '';
+
+                if (['memory', 'domino', 'bingo'].includes(viewId)) {
+                    const tpl = document.getElementById('tpl-generic-generator');
+                    container.appendChild(tpl.content.cloneNode(true));
+                    document.getElementById('gen-title').textContent = viewData.label;
+                    document.getElementById('gen-desc').textContent = viewData.desc || '';
+                    document.getElementById('gen-btn-print').onclick = () => this.generators[viewData.printFn]();
+                } else {
+                    const tpl = document.getElementById(`tpl-${viewId}`);
+                    if (tpl) container.appendChild(tpl.content.cloneNode(true));
+                    if (viewId === 'lesson-planner') {
+                        this.lessonPlanner.init();
+                        this.lessonPlanner.renderSelect();
+                        if(this.lessonPlanner.currentId) this.lessonPlanner.selectPlan(this.lessonPlanner.currentId);
+                    }
+                    if (viewId === 'seating-plan') {
+                        this.seating.init();
+                        this.seating.render();
+                    }
+                    if (viewId === 'time-tracker') {
+                        this.tracker.init();
+                        this.tracker.render();
+                    }
+                }
+
+                lucide.createIcons();
+            },
+
+            toast(msg) {
+                const c = document.getElementById('toast-container');
+                const t = document.createElement('div');
+                t.className = 'bg-[#403831] text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm font-medium toast-enter';
+                t.innerHTML = `<i data-lucide="check-circle-2" class="w-5 h-5 text-green-400"></i> ${escapeHtml(msg)}`;
+                c.appendChild(t);
+                lucide.createIcons();
+                setTimeout(() => { t.classList.replace('toast-enter', 'toast-leave'); setTimeout(() => t.remove(), 300); }, 3000);
+            },
+
+            didactics: {
+                getRandomTime(level, is24h) {
+                    const l = parseInt(level, 10);
+                    let h = Math.floor(Math.random() * 12) + 1; // 1-12
+                    let m = 0;
+
+                    if (l === 1) m = 0;
+                    else if (l === 2) m = Math.random() > 0.5 ? 0 : 30;
+                    else if (l === 3) m = [0, 15, 30, 45][Math.floor(Math.random() * 4)];
+                    else if (l === 4) m = Math.floor(Math.random() * 12) * 5; // 0, 5, 10... 55
+                    else m = Math.floor(Math.random() * 60);
+
+                    let displayH = h;
+                    let isPM = false;
+                    if (is24h) {
+                        isPM = Math.random() > 0.5;
+                        if (isPM && h !== 12) displayH += 12;
+                        if (!isPM && h === 12) displayH = 0;
+                    }
+
+                    return {
+                        h, m, displayH,
+                        formatStr: `${displayH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
+                        id: `${h}-${m}-${displayH}`
+                    };
+                },
+
+                getUniqueTimes(count, level, is24h) {
+                    const lvl = parseInt(level, 10);
+                    const times = [];
+                    const used = new Set();
+                    let attempts = 0;
+                    const maxAttempts = count * 40 + 200;
+                    while (times.length < count && attempts < maxAttempts) {
+                        const t = this.getRandomTime(level, is24h);
+                        const key = lvl <= 3 ? `${t.h}-${t.m}` : t.id;
+                        if (!used.has(key)) {
+                            used.add(key);
+                            times.push(t);
+                        }
+                        attempts++;
+                    }
+                    while (times.length < count) {
+                        times.push(this.getRandomTime(level, is24h));
+                    }
+                    return times;
+                },
+
+                minutesToDisplay(totalMinutes, is24h) {
+                    const tm = ((totalMinutes % 1440) + 1440) % 1440;
+                    const H = Math.floor(tm / 60);
+                    const M = tm % 60;
+                    let h12 = H % 12;
+                    if (h12 === 0) h12 = 12;
+                    const displayH = is24h ? H : h12;
+                    return {
+                        h: h12, m: M, displayH,
+                        formatStr: `${displayH.toString().padStart(2, '0')}:${M.toString().padStart(2, '0')}`
+                    };
+                },
+
+                getRandomDuration(level) {
+                    const lvl = parseInt(level, 10);
+                    const options = {
+                        1: [60, 120, 180],
+                        2: [30, 60, 90, 120],
+                        3: [15, 30, 45, 60, 75, 90],
+                        4: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
+                    };
+                    const arr = options[lvl] || options[3];
+                    return arr[Math.floor(Math.random() * arr.length)];
+                },
+
+                formatDuration(mins) {
+                    if (mins >= 60) {
+                        const h = Math.floor(mins / 60), m = mins % 60;
+                        return m ? `${h} Std ${m} Min` : `${h} Std`;
+                    }
+                    return `${mins} Min`;
+                },
+
+                generateSpanQuestion(level, is24h) {
+                    const m = this.getRandomTime(level, false).m; // nur die Minuten-Systematik der Stufe wiederverwenden
+                    const startHour24 = 6 + Math.floor(Math.random() * 14); // 06:00–19:59, bleibt am selben Tag
+                    const startTotal = startHour24 * 60 + m;
+                    const duration = this.getRandomDuration(level);
+                    const endTotal = startTotal + duration;
+                    return {
+                        start: this.minutesToDisplay(startTotal, is24h),
+                        end: this.minutesToDisplay(endTotal, is24h),
+                        duration
+                    };
+                },
+
+                generateSVG(h, m, showHands = true, width = "100%", hideTicks = false) {
+                    const hourAngle = ((h % 12) * 30) + (m * 0.5);
+                    const minuteAngle = m * 6;
+                    let ticks = '';
+                    if (!hideTicks) {
+                        for (let i = 1; i <= 60; i++) {
+                            const isThick = i % 5 === 0;
+                            const length = isThick ? 8 : 3;
+                            const strokeW = isThick ? '2.5' : '1';
+                            ticks += `<line x1="50" y1="2" x2="50" y2="${2 + length}" transform="rotate(${i*6} 50 50)" class="svg-stroke" stroke="#3E362E" stroke-width="${strokeW}" />`;
+                        }
+                    }
+                    let numbers = '';
+                    for (let i = 1; i <= 12; i++) {
+                        const rad = ((i * 30) - 90) * (Math.PI / 180);
+                        numbers += `<text x="${50 + 34 * Math.cos(rad)}" y="${50 + 34 * Math.sin(rad) + 4.5}" font-family="Inter" font-size="14" font-weight="700" text-anchor="middle" class="svg-fill" fill="#3E362E">${i}</text>`;
+                    }
+                    let hands = '';
+                    if (showHands) {
+                        hands += `<line x1="50" y1="50" x2="50" y2="25" transform="rotate(${hourAngle} 50 50)" class="svg-stroke" stroke="#3E362E" stroke-width="4.5" stroke-linecap="round"/>`;
+                        hands += `<line x1="50" y1="50" x2="50" y2="10" transform="rotate(${minuteAngle} 50 50)" class="svg-stroke" stroke="#BA7346" stroke-width="3" stroke-linecap="round"/>`;
+                    }
+                    hands += `<circle cx="50" cy="50" r="3.5" class="svg-fill" fill="${showHands ? '#BA7346' : '#8C7A6B'}" />`;
+                    return `<svg viewBox="0 0 100 100" width="${width}" height="${width}"><circle cx="50" cy="50" r="48" fill="white" stroke="#3E362E" stroke-width="2.5" class="svg-stroke"/>${ticks}${numbers}${hands}</svg>`;
+                },
+                getA4Header(title, subtitle) {
+                    return `
+                        <div class="flex justify-between items-end border-b-2 border-black pb-4 mb-8 shrink-0">
+                            <div><h2 class="text-3xl font-bold font-kids mb-1">${title}</h2><p class="text-sm font-medium">${subtitle}</p></div>
+                            <div class="text-sm font-medium flex gap-6">
+                                <div class="flex items-end gap-2">Name: <div class="w-40 border-b border-black">&nbsp;</div></div>
+                                <div class="flex items-end gap-2">Datum: <div class="w-24 border-b border-black">&nbsp;</div></div>
+                            </div>
+                        </div>`;
+                }
+            },
+
+            generators: {
+                print(htmlContent) {
+                    app.showPreview(htmlContent);
+                },
+
+                printWorksheet() {
+                    const task = document.getElementById('ws-task').value;
+                    const level = document.getElementById('ws-level').value;
+                    const is24h = document.getElementById('ws-format').value === '24';
+                    const withSolution = document.getElementById('ws-solution').checked;
+
+                    const times = app.didactics.getUniqueTimes(9, level, is24h);
+
+                    const buildPage = (isSolution) => {
+                        let gridHtml = '';
+                        times.forEach(t => {
+                            const svgHands = task === 'read' ? true : (isSolution ? true : false);
+                            const showText = task === 'draw' ? true : (isSolution ? true : false);
+                            const textHtml = showText ? t.formatStr : `<span class="opacity-0">00:00</span>`;
+                            const borderClass = task === 'read' && !isSolution ? 'border-b-2 border-dashed border-gray-400 w-24' : '';
+
+                            gridHtml += `
+                                <div class="flex flex-col items-center gap-4">
+                                    <div class="w-32 h-32">${app.didactics.generateSVG(t.h, t.m, svgHands)}</div>
+                                    <div class="text-2xl font-bold font-kids tracking-widest ${borderClass} text-center h-8">${textHtml}</div>
+                                </div>`;
+                        });
+
+                        const title = isSolution ? "LÖSUNG" : (task === 'read' ? "Wie spät ist es?" : "Zeichne die Zeiger ein!");
+                        const subtitle = isSolution ? "Vergleiche deine Ergebnisse." : (task === 'read' ? "Lies die Uhrzeit genau ab und notiere sie." : "Zeichne den Stundenzeiger (kurz) und Minutenzeiger (lang).");
+
+                        return `
+                            <div class="a4-page flex flex-col">
+                                ${app.didactics.getA4Header(title, subtitle)}
+                                <div class="print-grid-3x3 flex-1 mt-4">${gridHtml}</div>
+                            </div>`;
+                    };
+
+                    let finalHtml = buildPage(false);
+                    if (withSolution) finalHtml += buildPage(true);
+                    this.print(finalHtml);
+                },
+
+                printMemory() {
+                    const level = document.getElementById('gen-level').value;
+                    const is24h = document.getElementById('gen-format').value === '24';
+                    const times = app.didactics.getUniqueTimes(12, level, is24h); 
+
+                    let cards = [];
+                    times.forEach(t => {
+                        cards.push(`<div class="print-card-dashed p-2"><div class="w-20 h-20">${app.didactics.generateSVG(t.h, t.m, true)}</div></div>`);
+                        cards.push(`<div class="print-card-dashed p-2"><div class="text-3xl font-bold font-kids tracking-widest">${t.formatStr}</div></div>`);
+                    });
+                    cards.sort(() => Math.random() - 0.5);
+
+                    this.print(`
+                        <div class="a4-page flex flex-col">
+                            <h2 class="text-2xl font-bold mb-4 text-center shrink-0">Uhren-Memory (24 Karten)</h2>
+                            <div class="print-grid-4x6 flex-1">${cards.join('')}</div>
+                        </div>
+                    `);
+                },
+
+                printDomino() {
+                    const level = document.getElementById('gen-level').value;
+                    const is24h = document.getElementById('gen-format').value === '24';
+                    const times = app.didactics.getUniqueTimes(15, level, is24h);
+
+                    let cardsHtml = '';
+                    for (let i = 0; i < 14; i++) {
+                        const left = i === 0 ? '<span class="font-bold text-xl">START</span>' : `<span class="font-bold font-kids text-2xl tracking-widest">${times[i].formatStr}</span>`;
+                        const right = i === 13 ? '<span class="font-bold text-xl">ZIEL</span>' : `<div class="w-16 h-16">${app.didactics.generateSVG(times[i+1].h, times[i+1].m, true)}</div>`;
+
+                        cardsHtml += `
+                            <div class="print-card-solid">
+                                <div class="flex-1 flex justify-center p-2">${left}</div>
+                                <div class="w-px h-full bg-black"></div>
+                                <div class="flex-1 flex justify-center p-2">${right}</div>
+                            </div>`;
+                    }
+
+                    this.print(`
+                        <div class="a4-page flex flex-col">
+                            <h2 class="text-2xl font-bold mb-4 text-center shrink-0">Uhren-Domino (14 Steine)</h2>
+                            <div class="print-grid-2x7 flex-1">${cardsHtml}</div>
+                        </div>
+                    `);
+                },
+
+                printBingo() {
+                    const level = document.getElementById('gen-level').value;
+                    const is24h = document.getElementById('gen-format').value === '24';
+                    const pool = app.didactics.getUniqueTimes(24, level, is24h);
+
+                    let finalHtml = `
+                        <div class="a4-page flex flex-col">
+                            <h2 class="text-3xl font-bold text-center mb-2 shrink-0">Bingo - Leitungsblatt</h2>
+                            <p class="text-center mb-8 shrink-0">Schneide diese Zeiten aus oder hake sie beim Vorlesen ab.</p>
+                            <div class="print-grid-4x6 flex-1">
+                                ${pool.map(t => `<div class="print-card-dashed font-kids text-2xl font-bold">${t.formatStr}</div>`).join('')}
+                            </div>
+                        </div>`;
+
+                    for (let i = 0; i < 14; i++) {
+                        let playerTimes = [...pool].sort(() => Math.random() - 0.5).slice(0, 16);
+                        finalHtml += `
+                            <div class="a4-page flex flex-col">
+                                ${app.didactics.getA4Header("BINGO", "Finde die passende Uhr und kreuze sie an!")}
+                                <div class="print-grid-4x4 flex-1 mt-4">
+                                    ${playerTimes.map(t => `<div class="print-card-solid p-4"><div class="w-full h-full">${app.didactics.generateSVG(t.h, t.m, true)}</div></div>`).join('')}
+                                </div>
+                            </div>`;
+                    }
+                    this.print(finalHtml);
+                },
+
+                printDailyRoutine() {
+                    const raw = document.getElementById('dr-events').value;
+                    const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+                    const events = lines.length ? lines : ['Ereignis'];
+
+                    const rows = events.map(ev => `
+                        <div class="flex items-center gap-4 border-b border-gray-300 py-3">
+                            <div class="flex-1 font-bold font-kids text-lg">${escapeHtml(ev)}</div>
+                            <div class="w-16 h-16 shrink-0">${app.didactics.generateSVG(0, 0, false)}</div>
+                            <div class="w-28 border-b-2 border-black h-9 shrink-0"></div>
+                        </div>`).join('');
+
+                    const html = `
+                        <div class="a4-page flex flex-col">
+                            ${app.didactics.getA4Header('Mein Tagesablauf', 'Wann machst du das? Zeichne die Zeiger ein und schreibe die Uhrzeit auf.')}
+                            <div class="flex-1 mt-2">${rows}</div>
+                        </div>`;
+                    this.print(html);
+                },
+
+                printTimespan() {
+                    try {
+                        const level = document.getElementById('ts-level').value;
+                        const count = parseInt(document.getElementById('ts-count').value, 10) || 8;
+                        const is24h = document.getElementById('ts-format').value === '24';
+                        const withSolution = document.getElementById('ts-solution').checked;
+
+                        const questions = [];
+                        for (let i = 0; i < count; i++) questions.push(app.didactics.generateSpanQuestion(level, is24h));
+
+                        const buildRow = (q, reveal) => `
+                            <div class="flex items-center justify-between gap-3 border-b border-dashed border-gray-300 py-3">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-16 h-16 shrink-0">${app.didactics.generateSVG(q.start.h, q.start.m, true)}</div>
+                                    <div class="font-bold font-kids text-lg">${q.start.formatStr} Uhr</div>
+                                </div>
+                                <div class="text-2xl font-bold shrink-0">+</div>
+                                <div class="px-4 py-2 border-2 border-black rounded-lg font-bold text-sm whitespace-nowrap shrink-0">${app.didactics.formatDuration(q.duration)}</div>
+                                <div class="text-2xl font-bold shrink-0">=</div>
+                                <div class="w-32 h-10 shrink-0 flex items-center justify-center font-bold font-kids text-lg ${reveal ? '' : 'border-b-2 border-black'}">${reveal ? q.end.formatStr + ' Uhr' : ''}</div>
+                            </div>`;
+
+                        const buildPage = (reveal) => `
+                            <div class="a4-page flex flex-col">
+                                ${app.didactics.getA4Header(reveal ? 'Zeitspannen – Lösung' : 'Zeitspannen-Trainer', 'Start + Dauer = Ende. Berechne die fehlende Uhrzeit.')}
+                                <div class="flex-1 mt-4 space-y-2">${questions.map(q => buildRow(q, reveal)).join('')}</div>
+                            </div>`;
+
+                        let html = buildPage(false);
+                        if (withSolution) html += buildPage(true);
+                        this.print(html);
+                    } catch (e) {
+                        console.error("Zeitspannen Error:", e);
+                        app.toast("Fehler bei der Generierung der Zeitspannen.");
+                    }
+                },
+
+                printQuiz() {
+                    const level = document.getElementById('qz-level').value;
+                    const is24h = document.getElementById('qz-format').value === '24';
+                    const withSolution = document.getElementById('qz-solution').checked;
+
+                    const readTimes = app.didactics.getUniqueTimes(4, level, is24h);
+                    const drawTimes = app.didactics.getUniqueTimes(4, level, is24h);
+                    const spanQs = [app.didactics.generateSpanQuestion(level, is24h), app.didactics.generateSpanQuestion(level, is24h)];
+                    
+                    const boyNames = ['Max', 'Paul', 'Ben', 'Finn', 'Leon'];
+                    const girlNames = ['Lena', 'Emma', 'Mia', 'Lea', 'Anna'];
+                    
+                    const isBoy1 = Math.random() > 0.5;
+                    const name1 = isBoy1 ? boyNames[Math.floor(Math.random() * boyNames.length)] : girlNames[Math.floor(Math.random() * girlNames.length)];
+                    const pronoun1 = isBoy1 ? 'Er' : 'Sie';
+                    const pronoun1_lower = isBoy1 ? 'er' : 'sie';
+
+                    const isBoy2 = Math.random() > 0.5;
+                    const name2 = isBoy2 ? boyNames[Math.floor(Math.random() * boyNames.length)] : girlNames[Math.floor(Math.random() * girlNames.length)];
+
+                    const headerBlock = `
+                        <div class="border-b-2 border-black pb-3 mb-6 shrink-0">
+                            <div class="flex justify-between items-start mb-3">
+                                <h2 class="text-2xl font-bold">Lernkontrolle: Uhrzeiten</h2>
+                                <div class="text-right text-sm">
+                                    <div>Punkte: ____ / 12</div>
+                                    <div>Note: ______</div>
+                                </div>
+                            </div>
+                            <div class="flex gap-8 text-sm flex-wrap">
+                                <div class="flex items-end gap-2">Name: <div class="w-40 border-b border-black">&nbsp;</div></div>
+                                <div class="flex items-end gap-2">Gruppe: <div class="w-20 border-b border-black">&nbsp;</div></div>
+                                <div class="flex items-end gap-2">Datum: <div class="w-24 border-b border-black">&nbsp;</div></div>
+                            </div>
+                        </div>`;
+
+                    const page1 = `
+                        <div class="a4-page flex flex-col">
+                            ${headerBlock}
+                            <div class="mb-6">
+                                <h3 class="font-bold text-lg mb-1">Aufgabe 1: Lies die Uhrzeiten ab <span class="text-sm font-normal text-gray-500">(4 Punkte)</span></h3>
+                                <div class="grid grid-cols-4 gap-4 mt-3">
+                                    ${readTimes.map(t => `
+                                        <div class="flex flex-col items-center gap-2">
+                                            <div class="w-20 h-20">${app.didactics.generateSVG(t.h, t.m, true)}</div>
+                                            <div class="w-24 border-b-2 border-black h-8"></div>
+                                        </div>`).join('')}
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg mb-1">Aufgabe 2: Zeichne die Zeiger ein <span class="text-sm font-normal text-gray-500">(4 Punkte)</span></h3>
+                                <div class="grid grid-cols-4 gap-4 mt-3">
+                                    ${drawTimes.map(t => `
+                                        <div class="flex flex-col items-center gap-2">
+                                            <div class="w-20 h-20">${app.didactics.generateSVG(t.h, t.m, false)}</div>
+                                            <div class="font-bold font-kids">${t.formatStr}</div>
+                                        </div>`).join('')}
+                                </div>
+                            </div>
+                        </div>`;
+
+                    const page2 = `
+                        <div class="a4-page flex flex-col">
+                            <h3 class="font-bold text-lg mb-4 shrink-0">Aufgabe 3: Zeitspannen <span class="text-sm font-normal text-gray-500">(4 Punkte)</span></h3>
+                            <div class="space-y-8 mb-10 flex-1">
+                                <div>
+                                    <p class="mb-3">${name1} beginnt um <strong>${spanQs[0].start.formatStr} Uhr</strong> mit den Aufgaben. ${pronoun1} braucht <strong>${app.didactics.formatDuration(spanQs[0].duration)}</strong>. Um wie viel Uhr ist ${pronoun1_lower} fertig?</p>
+                                    <div class="flex items-center gap-2">Antwort: <div class="w-32 border-b-2 border-black h-8"></div> Uhr</div>
+                                </div>
+                                <div>
+                                    <p class="mb-3">${name2} schaut um <strong>${spanQs[1].start.formatStr} Uhr</strong> auf die Uhr und beginnt ein Spiel. Das Spiel dauert <strong>${app.didactics.formatDuration(spanQs[1].duration)}</strong>. Wann ist das Spiel zu Ende?</p>
+                                    <div class="flex items-center gap-2">Antwort: <div class="w-32 border-b-2 border-black h-8"></div> Uhr</div>
+                                </div>
+                            </div>
+                            <div class="mt-auto border-t-2 border-black pt-4 shrink-0">
+                                <h3 class="font-bold mb-2">Notenschlüssel</h3>
+                                <table class="w-full text-sm border-collapse">
+                                    <tr class="border-b border-gray-400"><td class="py-1 font-bold">Punkte</td><td class="py-1">12–11</td><td class="py-1">10–9</td><td class="py-1">8–7</td><td class="py-1">6–5</td><td class="py-1">4–3</td><td class="py-1">2–0</td></tr>
+                                    <tr><td class="py-1 font-bold">Note</td><td class="py-1">1</td><td class="py-1">2</td><td class="py-1">3</td><td class="py-1">4</td><td class="py-1">5</td><td class="py-1">6</td></tr>
+                                </table>
+                            </div>
+                        </div>`;
+
+                    let html = page1 + page2;
+
+                    if (withSolution) {
+                        html += `
+                            <div class="a4-page flex flex-col">
+                                <h2 class="text-2xl font-bold mb-6 border-b-2 border-black pb-3 shrink-0">Lösungen</h2>
+                                <div class="mb-6">
+                                    <h3 class="font-bold mb-2">Aufgabe 1</h3>
+                                    <div class="flex flex-wrap gap-6">${readTimes.map(t => `<div class="font-bold font-kids text-lg">${t.formatStr}</div>`).join('')}</div>
+                                </div>
+                                <div class="mb-6">
+                                    <h3 class="font-bold mb-2">Aufgabe 2</h3>
+                                    <div class="grid grid-cols-4 gap-4">${drawTimes.map(t => `<div class="w-16 h-16">${app.didactics.generateSVG(t.h, t.m, true)}</div>`).join('')}</div>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold mb-2">Aufgabe 3</h3>
+                                    <p>1) ${spanQs[0].end.formatStr} Uhr &nbsp;&nbsp; 2) ${spanQs[1].end.formatStr} Uhr</p>
+                                </div>
+                            </div>`;
+                    }
+
+                    this.print(html);
+                }
+            },
+
+            lessonPlanner: {
+                plans: [],
+                currentId: null,
+                unsub: null,
+                linkOptions: [
+                    { value: '', label: 'Kein Werkzeug verknüpft' },
+                    { value: 'worksheet', label: '→ Arbeitsblatt' },
+                    { value: 'memory', label: '→ Memory' },
+                    { value: 'domino', label: '→ Domino' },
+                    { value: 'bingo', label: '→ Klassen-Bingo' },
+                    { value: 'dailyroutine', label: '→ Tagesablauf' },
+                    { value: 'timespan', label: '→ Zeitspannen-Trainer' },
+                    { value: 'quiz', label: '→ Lernkontrolle' },
+                    { value: 'seating-plan', label: '→ Sitzplan' }
+                ],
+
+                seedPhases(level) {
+                    const mk = (title, minutes, description, linkTo) => ({ id: 'ph_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), title, minutes, description, linkTo });
+                    return [
+                        mk('Einstieg', 5, 'Gemeinsame Wiederholung / Begrüßung der Gruppe.', ''),
+                        mk('Erarbeitung', 15, 'Einführung des Themas.', ''),
+                        mk('Übung', 15, 'Material / Lernspiel anwenden.', ''),
+                        mk('Abschluss', 10, 'Sicherung der Ergebnisse und kurzes Feedback.', '')
+                    ];
+                },
+
+                init() {
+                    this.wireStaticButtons();
+                },
+
+                listen() {
+                    if (!app.user) return;
+                    if (this.unsub) this.unsub();
+                    
+                    const ref = collection(db, 'artifacts', APP_ID, 'public', 'data', 'lesson_plans');
+                    this.unsub = onSnapshot(ref, {
+                        next: (snap) => {
+                            this.plans = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                            this.plans.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                            this.renderSelect();
+                            
+                            if (!this.currentId && this.plans.length > 0) {
+                                this.selectPlan(this.plans[0].id);
+                            } else if (this.currentId) {
+                                this.selectPlan(this.currentId);
+                            }
+                        },
+                        error: (err) => {
+                            console.error('Stundenplan-Sync-Fehler', err);
+                        }
+                    });
+                },
+
+                renderSelect() {
+                    const sel = document.getElementById('lp-plan-select');
+                    if (!sel) return;
+                    sel.innerHTML = this.plans.map(p => `<option value="${p.id}">${escapeHtml(p.title || 'Ohne Titel')}</option>`).join('');
+                    if (this.currentId) sel.value = this.currentId;
+                    const emptyEl = document.getElementById('lp-empty');
+                    const editorEl = document.getElementById('lp-editor');
+                    if (emptyEl) emptyEl.classList.toggle('hidden', this.plans.length > 0);
+                    if (editorEl) editorEl.classList.toggle('hidden', this.plans.length === 0);
+                },
+
+                wireStaticButtons() {
+                    document.getElementById('lp-plan-select').onchange = (e) => this.selectPlan(e.target.value);
+                    document.getElementById('lp-btn-new').onclick = () => this.createPlan();
+                    document.getElementById('lp-btn-delete').onclick = () => this.deleteCurrent();
+                    document.getElementById('lp-btn-add-phase').onclick = () => this.addPhase();
+                    document.getElementById('lp-btn-print').onclick = () => this.printPlan();
+                    document.getElementById('lp-title').oninput = debounce(() => this.saveField('title', document.getElementById('lp-title').value), 500);
+                },
+
+                updateStatus(state) {
+                    const el = document.getElementById('lp-save-status');
+                    if (!el) return;
+                    if (!app.user) {
+                        el.textContent = 'Offline';
+                        el.className = 'text-xs text-red-500 font-bold ml-4';
+                        return;
+                    }
+                    if (state === 'saving') {
+                        el.textContent = 'Speichert...';
+                        el.className = 'text-xs text-orange-500 font-bold ml-4';
+                    } else if (state === 'saved') {
+                        el.textContent = 'Gespeichert ✓';
+                        el.className = 'text-xs text-green-600 font-bold ml-4';
+                    } else if (state === 'error') {
+                        el.textContent = 'Fehler beim Speichern!';
+                        el.className = 'text-xs text-red-600 font-bold ml-4';
+                    }
+                },
+
+                async createPlan() {
+                    if (!app.user) return;
+                    try {
+                        this.updateStatus('saving');
+                        const level = document.getElementById('lp-new-class').value;
+                        const levelName = level === '1' ? 'Gruppe 1' : 'Gruppe 2';
+                        const ref = collection(db, 'artifacts', APP_ID, 'public', 'data', 'lesson_plans');
+                        const docRef = await addDoc(ref, {
+                            title: `Neue Stunde (${levelName})`,
+                            classLevel: level,
+                            phases: this.seedPhases(level),
+                            createdAt: Date.now(),
+                            updatedAt: Date.now()
+                        });
+                        this.currentId = docRef.id;
+                        this.updateStatus('saved');
+                        app.toast('Neuer Plan erstellt!');
+                    } catch (err) {
+                        this.updateStatus('error');
+                        console.error('Speicherfehler:', err);
+                        app.toast('Fehler beim Speichern in der Cloud.');
+                    }
+                },
+
+                async deleteCurrent() {
+                    if (!this.currentId || !app.user) return;
+                    app.confirmAction('Diesen Plan wirklich unwiderruflich löschen?', async () => {
+                        try {
+                            const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'lesson_plans', this.currentId);
+                            await deleteDoc(ref);
+                            this.currentId = null;
+                            document.getElementById('lp-editor').classList.add('hidden');
+                            app.toast('Plan gelöscht.');
+                        } catch (err) {
+                            console.error('Löschfehler:', err);
+                            app.toast('Fehler beim Löschen.');
+                        }
+                    });
+                },
+
+                selectPlan(id) {
+                    this.currentId = id;
+                    const plan = this.plans.find(p => p.id === id);
+                    const sel = document.getElementById('lp-plan-select');
+                    if (sel) sel.value = id || '';
+                    if (!plan) return;
+                    const titleEl = document.getElementById('lp-title');
+                    if (titleEl) titleEl.value = plan.title || '';
+                    this.renderPhases(plan.phases || []);
+                    this.updateTotalMinutes(plan.phases || []);
+                },
+
+                getCurrentPlan() { return this.plans.find(p => p.id === this.currentId); },
+
+                renderPhases(phases) {
+                    const container = document.getElementById('lp-phases');
+                    if (!container) return;
+                    container.innerHTML = phases.map((p, idx) => phaseCardHtml(p, idx, phases.length, this.linkOptions)).join('');
+                    lucide.createIcons();
+                    container.querySelectorAll('.phase-card').forEach(card => {
+                        const pid = card.dataset.phaseId;
+                        card.querySelector('.lp-phase-title').oninput = debounce(() => this.updatePhaseField(pid, 'title', card.querySelector('.lp-phase-title').value), 500);
+                        card.querySelector('.lp-phase-minutes').oninput = debounce(() => this.updatePhaseField(pid, 'minutes', parseInt(card.querySelector('.lp-phase-minutes').value) || 0), 500);
+                        card.querySelector('.lp-phase-link').onchange = (e) => this.updatePhaseField(pid, 'linkTo', e.target.value);
+                        card.querySelector('.lp-phase-desc').oninput = debounce(() => this.updatePhaseField(pid, 'description', card.querySelector('.lp-phase-desc').value), 500);
+                        card.querySelector('.lp-phase-delete').onclick = () => this.removePhase(pid);
+                        const upBtn = card.querySelector('.lp-move-up');
+                        const downBtn = card.querySelector('.lp-move-down');
+                        if (upBtn) upBtn.onclick = () => this.movePhase(pid, -1);
+                        if (downBtn) downBtn.onclick = () => this.movePhase(pid, 1);
+                        const gotoBtn = card.querySelector('.lp-phase-goto');
+                        if (gotoBtn) gotoBtn.onclick = () => {
+                            const plan = this.getCurrentPlan();
+                            const phase = (plan?.phases || []).find(ph => ph.id === pid);
+                            if (!phase || !phase.linkTo) return;
+                            if (phase.linkTo === 'exit-ticket') app.generateExitTicket();
+                            else app.navigate(phase.linkTo);
+                        };
+                    });
+                },
+
+                updateTotalMinutes(phases) {
+                    const total = phases.reduce((s, p) => s + (parseInt(p.minutes) || 0), 0);
+                    const el = document.getElementById('lp-total-minutes');
+                    if (el) el.textContent = total;
+                },
+
+                async persistPhases(phases) {
+                    if (!this.currentId || !app.user) return;
+                    try {
+                        this.updateStatus('saving');
+                        const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'lesson_plans', this.currentId);
+                        await updateDoc(ref, { phases, updatedAt: Date.now() });
+                        this.updateStatus('saved');
+                    } catch (err) { 
+                        this.updateStatus('error');
+                        console.error('Cloud Sync Error', err); 
+                    }
+                },
+
+                async saveField(field, value) {
+                    if (!this.currentId || !app.user) return;
+                    try {
+                        this.updateStatus('saving');
+                        const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'lesson_plans', this.currentId);
+                        await updateDoc(ref, { [field]: value, updatedAt: Date.now() });
+                        this.updateStatus('saved');
+                    } catch (err) { 
+                        this.updateStatus('error');
+                        console.error('Cloud Sync Error', err); 
+                    }
+                },
+
+                updatePhaseField(phaseId, field, value) {
+                    const plan = this.getCurrentPlan();
+                    if (!plan) return;
+                    const phases = (plan.phases || []).map(p => p.id === phaseId ? { ...p, [field]: value } : p);
+                    plan.phases = phases;
+                    if (field === 'minutes') this.updateTotalMinutes(phases);
+                    this.persistPhases(phases);
+                },
+
+                addPhase() {
+                    const plan = this.getCurrentPlan();
+                    if (!plan) return;
+                    const phases = [...(plan.phases || []), { id: 'ph_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), title: 'Neue Phase', minutes: 10, description: '', linkTo: '' }];
+                    plan.phases = phases;
+                    this.renderPhases(phases);
+                    this.updateTotalMinutes(phases);
+                    this.persistPhases(phases);
+                },
+
+                removePhase(phaseId) {
+                    const plan = this.getCurrentPlan();
+                    if (!plan) return;
+                    const phases = (plan.phases || []).filter(p => p.id !== phaseId);
+                    plan.phases = phases;
+                    this.renderPhases(phases);
+                    this.updateTotalMinutes(phases);
+                    this.persistPhases(phases);
+                },
+
+                movePhase(phaseId, dir) {
+                    const plan = this.getCurrentPlan();
+                    if (!plan) return;
+                    const phases = [...(plan.phases || [])];
+                    const idx = phases.findIndex(p => p.id === phaseId);
+                    const newIdx = idx + dir;
+                    if (idx < 0 || newIdx < 0 || newIdx >= phases.length) return;
+                    [phases[idx], phases[newIdx]] = [phases[newIdx], phases[idx]];
+                    plan.phases = phases;
+                    this.renderPhases(phases);
+                    this.persistPhases(phases);
+                },
+
+                printPlan() {
+                    const plan = this.getCurrentPlan();
+                    if (!plan) return;
+                    const rows = (plan.phases || []).map(p => `
+                        <div class="flex gap-4 border-b border-dashed border-gray-300 py-4">
+                            <div class="w-16 font-bold text-[var(--primary)] shrink-0">${p.minutes || 0} Min</div>
+                            <div class="flex-1">
+                                <div class="font-bold text-lg">${escapeHtml(p.title || '')}</div>
+                                <div class="text-sm text-gray-700 whitespace-pre-wrap mt-1">${escapeHtml(p.description || '')}</div>
+                            </div>
+                        </div>`).join('');
+                    const total = (plan.phases || []).reduce((s, p) => s + (parseInt(p.minutes) || 0), 0);
+                    const html = `
+                        <div class="a4-page flex flex-col">
+                            <div class="border-b-2 border-black pb-4 mb-6 shrink-0">
+                                <h2 class="text-3xl font-bold font-kids">${escapeHtml(plan.title || 'Unterrichtsplan')}</h2>
+                                <p class="text-sm text-gray-600 mt-1">Gesamtdauer: ${total} Minuten</p>
+                            </div>
+                            <div class="flex-1">${rows || '<p class="text-gray-400">Noch keine Phasen angelegt.</p>'}</div>
+                        </div>`;
+                    app.generators.print(html);
+                }
+            },
+
+            seating: {
+                data: {},
+                layout: 'rows',
+                unsub: null,
+
+                init() {
+                    document.getElementById('sp-layout').onchange = (e) => { this.layout = e.target.value; this.render(); this.save(); };
+                    document.getElementById('sp-btn-clear').onclick = () => this.clearAll();
+                    document.getElementById('sp-btn-print').onclick = () => this.print();
+                },
+
+                listen() {
+                    if (!app.user) return;
+                    if (this.unsub) this.unsub();
+                    const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'settings', 'seating_plan');
+                    this.unsub = onSnapshot(ref, (snap) => {
+                        const d = snap.exists() ? snap.data() : {};
+                        this.data = d.desks || {};
+                        this.layout = d.layout || 'rows';
+                        const sel = document.getElementById('sp-layout');
+                        if (sel) sel.value = this.layout;
+                        this.render();
+                    }, (err) => console.error('Sitzplan-Sync-Fehler', err));
+                },
+
+                updateStatus(state) {
+                    const el = document.getElementById('sp-save-status');
+                    if (!el) return;
+                    if (!app.user) {
+                        el.textContent = 'Offline';
+                        el.className = 'text-xs text-red-500 font-bold mr-2 hidden sm:block';
+                        return;
+                    }
+                    if (state === 'saving') {
+                        el.textContent = 'Speichert...';
+                        el.className = 'text-xs text-orange-500 font-bold mr-2 hidden sm:block';
+                    } else if (state === 'saved') {
+                        el.textContent = 'Gespeichert ✓';
+                        el.className = 'text-xs text-green-600 font-bold mr-2 hidden sm:block';
+                    } else if (state === 'error') {
+                        el.textContent = 'Fehler!';
+                        el.className = 'text-xs text-red-600 font-bold mr-2 hidden sm:block';
+                    }
+                },
+
+                render() {
+                    const grid = document.getElementById('sp-grid');
+                    if (!grid) return;
+                    grid.innerHTML = '';
+
+                    if (this.layout === 'groups') {
+                        grid.className = 'w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4 bg-[#FAF9F6] rounded-xl border border-[var(--border)]';
+                        for (let g = 0; g < 6; g++) {
+                            const groupWrap = document.createElement('div');
+                            groupWrap.className = 'grid grid-cols-2 gap-2 p-3 bg-white border border-[var(--border)] rounded-xl shadow-sm';
+                            for (let d = 0; d < 4; d++) groupWrap.appendChild(this.makeInput(`desk_${g * 4 + d}`));
+                            grid.appendChild(groupWrap);
+                        }
+                    } else if (this.layout === 'horseshoe') {
+                        grid.className = 'w-full grid grid-cols-7 gap-3 p-4 bg-[#FAF9F6] rounded-xl border border-[var(--border)]';
+                        for (let row = 0; row < 5; row++) {
+                            for (let col = 0; col < 7; col++) {
+                                if (row === 0 || col === 0 || col === 6) grid.appendChild(this.makeInput(`desk_hs_${row}_${col}`));
+                                else grid.appendChild(document.createElement('div'));
+                            }
+                        }
+                    } else {
+                        grid.className = 'w-full grid grid-cols-5 md:grid-cols-6 gap-3 p-4 bg-[#FAF9F6] rounded-xl border border-[var(--border)]';
+                        for (let i = 0; i < 30; i++) grid.appendChild(this.makeInput(`desk_${i}`));
+                    }
+                },
+
+                makeInput(id) {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = this.data[id] || '';
+                    input.placeholder = 'Name...';
+                    input.className = 'w-full h-12 text-center text-sm font-medium border border-[var(--border)] rounded-lg bg-white focus:border-[var(--primary)] outline-none shadow-sm';
+                    input.oninput = debounce(() => { this.data[id] = input.value; this.save(); }, 400);
+                    return input;
+                },
+
+                async save() {
+                    if (!app.user) {
+                        this.updateStatus('error');
+                        return;
+                    }
+                    try {
+                        this.updateStatus('saving');
+                        const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'settings', 'seating_plan');
+                        await setDoc(ref, { desks: this.data, layout: this.layout }, { merge: true });
+                        this.updateStatus('saved');
+                    } catch (err) {
+                        this.updateStatus('error');
+                        console.error('Speicherfehler:', err);
+                        app.toast('Fehler beim Speichern des Sitzplans.');
+                    }
+                },
+
+                clearAll() {
+                    app.confirmAction('Wirklich alle Namen für alle Nutzer löschen?', () => {
+                        this.data = {};
+                        this.render();
+                        this.save();
+                        app.toast('Sitzplan geleert.');
+                    });
+                },
+
+                print() {
+                    let bodyHtml = '';
+                    if (this.layout === 'groups') {
+                        bodyHtml = `<div class="grid grid-cols-3 gap-6 flex-1">`;
+                        for (let g = 0; g < 6; g++) {
+                            bodyHtml += `<div class="grid grid-cols-2 gap-2 border-2 border-black rounded-lg p-2">`;
+                            for (let d = 0; d < 4; d++) {
+                                const name = this.data[`desk_${g * 4 + d}`] || '';
+                                bodyHtml += `<div class="border border-gray-400 rounded p-2 text-center text-sm font-medium h-12 flex items-center justify-center">${escapeHtml(name)}</div>`;
+                            }
+                            bodyHtml += `</div>`;
+                        }
+                        bodyHtml += `</div>`;
+                    } else if (this.layout === 'horseshoe') {
+                        bodyHtml = `<div class="grid grid-cols-7 gap-2 flex-1">`;
+                        for (let row = 0; row < 5; row++) {
+                            for (let col = 0; col < 7; col++) {
+                                if (row === 0 || col === 0 || col === 6) {
+                                    const name = this.data[`desk_hs_${row}_${col}`] || '';
+                                    bodyHtml += `<div class="border border-gray-400 rounded p-2 text-center text-xs font-medium h-12 flex items-center justify-center">${escapeHtml(name)}</div>`;
+                                } else {
+                                    bodyHtml += `<div></div>`;
+                                }
+                            }
+                        }
+                        bodyHtml += `</div>`;
+                    } else {
+                        bodyHtml = `<div class="grid grid-cols-6 gap-3 flex-1">`;
+                        for (let i = 0; i < 30; i++) {
+                            const name = this.data[`desk_${i}`] || '';
+                            bodyHtml += `<div class="border border-gray-400 rounded p-2 text-center text-sm font-medium h-14 flex items-center justify-center">${escapeHtml(name)}</div>`;
+                        }
+                        bodyHtml += `</div>`;
+                    }
+                    const html = `
+                        <div class="a4-page flex flex-col">
+                            <h2 class="text-2xl font-bold text-center mb-2 shrink-0">Sitzplan</h2>
+                            <div class="text-center text-sm text-gray-500 mb-6 shrink-0">Lehrerpult / Tafel</div>
+                            ${bodyHtml}
+                        </div>`;
+                    app.generators.print(html);
+                }
+            },
+
+            tracker: {
+                students: [],
+                unsub: null,
+                init() {
+                    const form = document.getElementById('add-student-form');
+                    if(form) form.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        this.addStudent();
+                    });
+                },
+                listen() {
+                    if (!app.user) return;
+                    if (this.unsub) this.unsub();
+                    const ref = collection(db, 'artifacts', APP_ID, 'public', 'data', 'students');
+                    this.unsub = onSnapshot(ref, (snap) => {
+                        this.students = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        this.students.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                        this.render();
+                    });
+                },
+                render() {
+                    const tbody = document.getElementById('tracker-tbody');
+                    if (!tbody) return;
+                    tbody.innerHTML = '';
+                    if (this.students.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-[#8C7A6B]">Noch keine Kinder eingetragen.</td></tr>';
+                        return;
+                    }
+                    this.students.forEach(s => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'border-b border-[#E8DCCB] hover:bg-[#FAF9F6] transition-colors';
+                        let tdHtml = `<td class="py-3 px-4 font-bold text-[#3E362E]">${escapeHtml(s.name)}</td>`;
+                        ['voll', 'halb', 'viertel', 'minuten'].forEach(field => {
+                            tdHtml += `<td class="py-3 px-4 text-center"><input type="checkbox" ${s[field] ? 'checked' : ''} data-id="${s.id}" data-field="${field}" class="tracker-cb w-5 h-5 accent-[var(--primary)] cursor-pointer"></td>`;
+                        });
+                        tdHtml += `<td class="py-3 px-4 text-right"><button data-id="${s.id}" class="tracker-del text-gray-400 hover:text-red-500 p-1"><i data-lucide="trash-2" class="w-5 h-5 inline-block"></i></button></td>`;
+                        tr.innerHTML = tdHtml;
+                        tbody.appendChild(tr);
+                    });
+                    lucide.createIcons();
+
+                    document.querySelectorAll('.tracker-cb').forEach(cb => {
+                        cb.addEventListener('change', (e) => {
+                            this.updateField(e.target.dataset.id, e.target.dataset.field, e.target.checked);
+                        });
+                    });
+                    document.querySelectorAll('.tracker-del').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            this.deleteStudent(e.target.closest('button').dataset.id);
+                        });
+                    });
+                },
+                async addStudent() {
+                    const input = document.getElementById('new-student-name');
+                    const name = input.value.trim();
+                    if (!name || !app.user) return;
+                    try {
+                        await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'students'), {
+                            name, voll: false, halb: false, viertel: false, minuten: false, createdAt: Date.now()
+                        });
+                        input.value = '';
+                        app.toast('Kind hinzugefügt!');
+                    } catch(err) {
+                        console.error(err);
+                        app.toast('Fehler beim Hinzufügen');
+                    }
+                },
+                async updateField(id, field, value) {
+                    if (!app.user) return;
+                    try {
+                        await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'students', id), { [field]: value });
+                    } catch(err) { console.error(err); }
+                },
+                async deleteStudent(id) {
+                    if (!app.user) return;
+                    app.confirmAction('Dieses Kind wirklich entfernen?', async () => {
+                        try {
+                            await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'students', id));
+                            app.toast('Kind entfernt.');
+                        } catch(err) { console.error(err); }
+                    });
+                }
+            },
+
+            generateExitTicket() {
+                const times = app.didactics.getUniqueTimes(4, 3, true); 
+                const html = `
+                    <div class="a4-page flex flex-col">
+                        <div class="mb-4 text-center border-b-2 border-black pb-2 shrink-0">
+                            <h2 class="text-2xl font-bold font-kids">⚡ 5-Minuten-Ticket</h2>
+                            <div class="flex justify-between px-10 mt-2 text-sm"><span>Name: _______________</span><span>Lies die Uhrzeit ab!</span></div>
+                        </div>
+                        <div class="flex justify-around items-center py-4 border-b border-dashed border-gray-300">
+                            ${times.slice(0, 2).map(t => `<div class="flex flex-col items-center gap-2"><div class="w-24 h-24">${app.didactics.generateSVG(t.h, t.m, true)}</div><div class="w-24 border-b-2 border-black h-8"></div></div>`).join('')}
+                        </div>
+                        <div class="mt-8 mb-4 text-center border-b-2 border-black pb-2 shrink-0">
+                            <h2 class="text-2xl font-bold font-kids">⚡ 5-Minuten-Ticket</h2>
+                            <div class="flex justify-between px-10 mt-2 text-sm"><span>Name: _______________</span><span>Zeichne die Zeiger ein!</span></div>
+                        </div>
+                        <div class="flex justify-around items-center py-4">
+                            ${times.slice(2, 4).map(t => `<div class="flex flex-col items-center gap-2"><div class="w-24 h-24">${app.didactics.generateSVG(t.h, t.m, false)}</div><div class="font-bold text-xl">${t.formatStr}</div></div>`).join('')}
+                        </div>
+                    </div>
+                `;
+                this.generators.print(html);
+            }
+        };
+
+        // Initialize Application
+        window.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
